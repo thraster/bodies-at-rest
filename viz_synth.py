@@ -3,6 +3,8 @@ import open3d as o3d
 import utils
 import numpy as np
 import cv2
+import scipy.io
+import os
 
 def load_pickle(filename):
     with open(filename, 'rb') as f:
@@ -27,18 +29,21 @@ class load_synth():
     10. bed_angle_deg:  床角度偏移？ 1位float
     '''
 
-    def __init__(self, pfile_path, root_path =None):
-        self.pfile_path = pfile_path
+    def __init__(self, pfile_path):
         print(f"loading pfile: {pfile_path}")
-        if root_path == None:
-            self.dat = load_pickle(self.pfile_path)
-            self.keys = self.dat.keys()
+
+        self.pfile_path = pfile_path
+        self.dat = load_pickle(self.pfile_path)
+        self.keys = self.dat.keys()
+        self.length = len(self.dat['markers_xyz_m'])
+        self.name = os.path.basename(pfile_path)
+
 
         if '_m_' in pfile_path:
             self.gender = 'm'
         elif '_f_' in pfile_path:
             self.gender = 'f'
-        print(f"data info: \n gender: {self.gender}\n length: {len(self.dat['markers_xyz_m'])}\n")
+        print(f"data info: \n gender: {self.gender}\n length: {self.length}\n")
 
     def get_skeleton(self, iter=0, viz=False):
         '''
@@ -167,16 +172,32 @@ class load_synth():
             print(f"iter = {iter} out of boundary: 0~{len(self.dat['markers_xyz_m'])-1}")
 
 
-    def to_file_mod1(self, save_path, ):
+    def to_file_mod1(self, save_path):
         '''
         提取需要的pressure map和skeleton, 分别保存为.png和.mat
+        save_path------train\test---name--- name_001.png, name_002.png, ...name_001.mat, name_002.mat, ...
         '''
-        
-        pass
+        print(f'coverting file {self.name} to pressure map and skeleton...')
+        root_dir = os.path.join(save_path)
+        for i in range(self.length):
+            print(f'frame {i}', end='\r')
+            if "test_" in self.name:
+                temp_dir = os.path.join(root_dir, 'test')
+            elif "train_" in self.name:
+                temp_dir = os.path.join(root_dir, 'train')
+
+            dir = os.path.join(temp_dir, self.name[:-2])
+            os.makedirs(dir, exist_ok=True)
+
+            pressure_map_path = os.path.join(dir, f'{i}.png')
+            skeleton_annotations_path = os.path.join(dir,  f'{i}.mat')
+            cv2.imwrite(pressure_map_path, self.get_pmap(i))
+            scipy.io.savemat(skeleton_annotations_path, {'3D_skeleton_annotation':self.get_skeleton(i)})
+
 
 
 if __name__ == "__main__":
-    import os
+    # import os
     root_path = r'D:\workspace\python_ws\bodies-at-rest-master\data_BR\synth'
 
     for root, dirnames, filenames in os.walk(root_path):
@@ -185,3 +206,7 @@ if __name__ == "__main__":
         # print(dirnames)
         for filename in filenames:
             sbj = load_synth(root+ '\\' +filename)
+            sbj.to_file_mod1(r"D:\workspace\python_ws\bodies-at-rest-master\dataset")
+
+    # sbj = load_synth(r"data_BR\synth\crossed_legs\test_roll0_xl_f_lay_set1both_500.p")
+    # sbj.to_file_mod1(r"D:\workspace\python_ws\bodies-at-rest-master\dataset")

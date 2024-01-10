@@ -141,7 +141,7 @@ class UnpackBatchLib():
                          Variable(batch[2].type(CTRL_PNL['dtype']), requires_grad=False)
 
         angles_gt = Variable(batch[3].type(CTRL_PNL['dtype']), requires_grad=is_training)
-        root_shift = Variable(batch[4].type(CTRL_PNL['dtype']), requires_grad=is_training)
+        root_shift = Variable(batch[4].type(CTRL_PNL['dtype']), requires_grad=is_training) # estimated root_shift
         gender_switch = Variable(batch[5].type(CTRL_PNL['dtype']), requires_grad=is_training)
         synth_real_switch = Variable(batch[6].type(CTRL_PNL['dtype']), requires_grad=is_training)
 

@@ -177,7 +177,8 @@ class CNN(nn.Module):
                 self.verts_list = [1325, 336, 1032, 4515, 1374, 4848, 1739, 5209, 1960, 5423]
             self.meshDepthLib = MeshDepthLib(loss_vector_type=self.loss_vector_type,
                                              batch_size=images.size(0), verts_list = self.verts_list)
-
+        
+        # 1. 输入CNN，输出特征图
         if CTRL_PNL['all_tanh_activ'] == True:
             if CTRL_PNL['double_network_size'] == False:
                 scores_cnn = self.CNN_packtanh(images)
@@ -189,17 +190,19 @@ class CNN(nn.Module):
 
         scores_size = scores_cnn.size()
 
-
+        # 2. 展开特征图为1维tensor
         # This combines the height, width, and filters into a single dimension
         scores_cnn = scores_cnn.view(images.size(0),scores_size[1] *scores_size[2]*scores_size[3])
 
+
+        # 3. 经过全连接层获得N * 85的输出
         # this output is N x 85: betas, root shift, angles
         if CTRL_PNL['double_network_size'] == False:
             scores = self.CNN_fc1(scores_cnn)
         else:
             scores = self.CNN_fc1_double(scores_cnn)
 
-
+        # 4. 把输出加权缩放为之前的0.01倍
         # weight the outputs, which are already centered around 0. First make them uniformly smaller than the direct output, which is too large.
         if CTRL_PNL['adjust_ang_from_est'] == True:
             scores = torch.mul(scores.clone(), 0.01)
@@ -215,6 +218,7 @@ class CNN(nn.Module):
         #    scores[:, i] = torch.mul(scores[:, i].clone(), output_norm[i])
 
 
+        # 5. 对root trans进行加权处理，使其更加接近真实情况
         #add a factor so the model starts close to the home position. Has nothing to do with weighting.
 
         if CTRL_PNL['lock_root'] == True:
@@ -266,11 +270,13 @@ class CNN(nn.Module):
                 scores[:, 13:85] = scores[:, 13:85].clone() + OUTPUT_EST_DICT['angles']
             #scores[:, 13:85] = OUTPUT_EST_DICT['angles']
 
-
+        # shape参数
         OUTPUT_DICT['batch_betas_est'] = scores[:, 0:10].clone().data
         if CTRL_PNL['full_body_rot'] == True:
             OUTPUT_DICT['batch_root_atan2_est'] = scores[:, 13:19].clone().data
+        # pose参数
         OUTPUT_DICT['batch_angles_est']  = scores[:, 13+OSA:85+OSA].clone().data
+        # 全局偏移参数
         OUTPUT_DICT['batch_root_xyz_est'] = scores[:, 10:13].clone().data
 
 

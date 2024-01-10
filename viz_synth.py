@@ -37,12 +37,12 @@ class load_synth():
         self.keys = self.dat.keys()
         self.length = len(self.dat['markers_xyz_m'])
         self.name = os.path.basename(pfile_path)
-
+        # self.gender = 0 if '_f_' in self.name else 1
 
         if '_m_' in pfile_path:
-            self.gender = 'm'
+            self.gender = 1
         elif '_f_' in pfile_path:
-            self.gender = 'f'
+            self.gender = 0
         print(f"data info: \n gender: {self.gender}\n length: {self.length}\n")
 
     def get_skeleton(self, iter=0, viz=False):
@@ -51,7 +51,7 @@ class load_synth():
         '''
         try:
             nodes_3d = self.dat['markers_xyz_m'][iter].reshape(24,3)
-
+            # print(nodes_3d.dtype)
             if viz == True:
                 # 创建一个Open3D点云对象
                 pcd = o3d.geometry.PointCloud()
@@ -66,89 +66,93 @@ class load_synth():
         except:
             print(f"iter = {iter} out of boundary: 0~{len(self.dat['markers_xyz_m'])-1}")
 
-    def get_mesh(self, iter=0, viz=False):
+    def get_trans(self, iter = 0):
+        """
+        返回根节点偏移量
+        """
+        return self.dat['root_xyz_shift'][iter]
+
+    def get_groundtruthmesh(self, iter=0, viz=False):
         '''
         visuilzing the 3D smpl mesh of human body
         '''
         
-        try:
-            shapes = self.dat['body_shape'][iter]
-            poses = self.dat['joint_angles'][iter]
 
-            if self.gender == 'm':
-                smpl = pickle._Unpickler(open(r"smpl\basicmodel_m_lbs_10_207_0_v1.0.0.pkl", "rb"), encoding='latin1')
-                smpl = smpl.load()
-            elif self.gender == 'f':
-                smpl = pickle._Unpickler(open(r"smpl\basicModel_f_lbs_10_207_0_v1.0.0.pkl", "rb"), encoding='latin1')
-                smpl = smpl.load()
+        shapes = self.dat['body_shape'][iter]
+        poses = self.dat['joint_angles'][iter]
 
-            # 计算shape参数下对应的身材
-            v_shaped = smpl['shapedirs'].dot(shapes) + smpl['v_template']
+        if self.gender == 1:
+            smpl = pickle._Unpickler(open(r"smpl\basicmodel_m_lbs_10_207_0_v1.0.0.pkl", "rb"), encoding='latin1')
+            smpl = smpl.load()
+        elif self.gender == 0:
+            smpl = pickle._Unpickler(open(r"smpl\basicModel_f_lbs_10_207_0_v1.0.0.pkl", "rb"), encoding='latin1')
+            smpl = smpl.load()
 
-            # 计算 T-pose 下 joints 位置
-            J = smpl['J_regressor'].dot(v_shaped)     
+        # 计算shape参数下对应的身材
+        v_shaped = smpl['shapedirs'].dot(shapes) + smpl['v_template']
 
-            # 计算受 pose 影响下调整臀部之后的 vertices
-            v_posed = v_shaped + smpl['posedirs'].dot(utils.posemap(poses))   
+        # 计算 T-pose 下 joints 位置
+        J = smpl['J_regressor'].dot(v_shaped)     
 
-            # 将 v_posed 变成齐次坐标矩阵 (6890, 4)
-            v_posed_homo = np.vstack((v_posed.T, np.ones([1, v_posed.shape[0]])))   
-            
-            # 将关节点的轴角 (axial-angle) 形状为 [24, 3]
-            poses = poses.reshape((-1,3))
+        # 计算受 pose 影响下调整臀部之后的 vertices
+        v_posed = v_shaped + smpl['posedirs'].dot(utils.posemap(poses))   
 
-            # 定义 SMPL 的关节树, 开始骨骼绑定操作
-            id_to_col = {smpl['kintree_table'][1,i] : i for i in range(smpl['kintree_table'].shape[1])}
-            parent = {i : id_to_col[smpl['kintree_table'][0,i]] for i in range(1, smpl['kintree_table'].shape[1])}
+        # 将 v_posed 变成齐次坐标矩阵 (6890, 4)
+        v_posed_homo = np.vstack((v_posed.T, np.ones([1, v_posed.shape[0]])))   
+        
+        # 将关节点的轴角 (axial-angle) 形状为 [24, 3]
+        poses = poses.reshape((-1,3))
 
-            rodrigues = lambda x: cv2.Rodrigues(x)[0]
-            Ts = np.zeros([24,4,4])
+        # 定义 SMPL 的关节树, 开始骨骼绑定操作
+        id_to_col = {smpl['kintree_table'][1,i] : i for i in range(smpl['kintree_table'].shape[1])}
+        self.parent = {i : id_to_col[smpl['kintree_table'][0,i]] for i in range(1, smpl['kintree_table'].shape[1])}
 
-            # 首先计算根结点 (0) 的相机坐标变换, 或者说是根结点相对相机坐标系的位姿
+        rodrigues = lambda x: cv2.Rodrigues(x)[0]
+        Ts = np.zeros([24,4,4])
+
+        # 首先计算根结点 (0) 的相机坐标变换, 或者说是根结点相对相机坐标系的位姿
+        T = np.zeros([4,4])
+        T[:3, :3] = rodrigues(poses[0])     # 轴角转换到旋转矩阵，相对相机坐标而言
+        T[:3, 3] = J[0]                     # 根结点在相机坐标系下的位置
+        T[3, 3] = 1                         # 齐次矩阵，1
+        Ts[0] = T
+
+        # 计算子节点 (1~24) 的相机坐标变换
+        for i in range(1,24):
+            # 首先计算子节点相对父节点坐标系的位姿 [R|t]
             T = np.zeros([4,4])
-            T[:3, :3] = rodrigues(poses[0])     # 轴角转换到旋转矩阵，相对相机坐标而言
-            T[:3, 3] = J[0]                     # 根结点在相机坐标系下的位置
-            T[3, 3] = 1                         # 齐次矩阵，1
-            Ts[0] = T
+            T[3, 3] = 1
 
-            # 计算子节点 (1~24) 的相机坐标变换
-            for i in range(1,24):
-                # 首先计算子节点相对父节点坐标系的位姿 [R|t]
-                T = np.zeros([4,4])
-                T[3, 3] = 1
+            # 计算子节点相对父节点的旋转矩阵 R
+            T[:3, :3] = rodrigues(poses[i])
 
-                # 计算子节点相对父节点的旋转矩阵 R
-                T[:3, :3] = rodrigues(poses[i])
+            # 计算子节点相对父节点的偏移量 t
+            T[:3, 3]  = J[i] - J[self.parent[i]]
 
-                # 计算子节点相对父节点的偏移量 t
-                T[:3, 3]  = J[i] - J[parent[i]]
+            # 然后计算子节点相对相机坐标系的位姿
+            Ts[i] = np.matmul(Ts[self.parent[i]], T) # 乘上其父节点的变换矩阵
 
-                # 然后计算子节点相对相机坐标系的位姿
-                Ts[i] = np.matmul(Ts[parent[i]], T) # 乘上其父节点的变换矩阵
+        global_joints = Ts[:, :3, 3].copy() # 所有关节点在相机坐标系下的位置
 
-            global_joints = Ts[:, :3, 3].copy() # 所有关节点在相机坐标系下的位置
+        # 计算每个子节点相对 T-pose 时的位姿矩阵
+        # 由于子节点在 T-pose 状态下坐标系朝向和相机坐标系相同，因此旋转矩阵不变, 只需要减去 T-pose 时的关节点位置就行
 
-            # 计算每个子节点相对 T-pose 时的位姿矩阵
-            # 由于子节点在 T-pose 状态下坐标系朝向和相机坐标系相同，因此旋转矩阵不变, 只需要减去 T-pose 时的关节点位置就行
+        for i in range(24):
+            R = Ts[i][:3, :3]
+            t = Ts[i][:3, 3] - R.dot(J[i])              # 子节点相对T-pose的偏移 t
+            Ts[i][:3, 3] = t
 
-            for i in range(24):
-                R = Ts[i][:3, :3]
-                t = Ts[i][:3, 3] - R.dot(J[i])              # 子节点相对T-pose的偏移 t
-                Ts[i][:3, 3] = t
+        # 开始蒙皮操作，LBS 过程
+        vertices_homo = np.matmul(smpl['weights'].dot(Ts.reshape([24,16])).reshape([-1,4,4]), v_posed_homo.T.reshape([-1, 4, 1]))
+        vertices = vertices_homo.reshape([-1, 4])[:,:3]    # 由于是齐次矩阵，取前3列
+        joints = smpl['J_regressor'].dot(vertices)     # 计算 pose 下 joints 位置，基本与 global_joints 一致
 
-            # 开始蒙皮操作，LBS 过程
-            vertices_homo = np.matmul(smpl['weights'].dot(Ts.reshape([24,16])).reshape([-1,4,4]), v_posed_homo.T.reshape([-1, 4, 1]))
-            vertices = vertices_homo.reshape([-1, 4])[:,:3]    # 由于是齐次矩阵，取前3列
-            joints = smpl['J_regressor'].dot(vertices)     # 计算 pose 下 joints 位置，基本与 global_joints 一致
+        # utils.render(vertices, smpl['f'], joints)
+        if viz == True:
+            utils.render(vertices, smpl['f'], global_joints)
 
-            # utils.render(vertices, smpl['f'], joints)
-            if viz == True:
-                utils.render(vertices, smpl['f'], global_joints)
+        return joints
 
-            return vertices
-
-        except:
-            print(f"iter = {iter} out of boundary: 0~{len(self.dat['markers_xyz_m'])-1}")
 
     def get_pmap(self, iter=0, viz=False):
         '''
@@ -157,6 +161,7 @@ class load_synth():
         try:
             # 64*27的图片
             img = self.dat['images'][iter].reshape(64,27)
+            # print(img.dtype)
             # 使用 cv2.imshow() 显示图像
             if viz == True:
                 cv2.imshow(f'pressure map of iter: {iter}', img)
@@ -172,7 +177,7 @@ class load_synth():
             print(f"iter = {iter} out of boundary: 0~{len(self.dat['markers_xyz_m'])-1}")
 
 
-    def to_file_mod1(self, save_path):
+    def to_file_mod2(self, save_path):
         '''
         提取需要的pressure map和skeleton, 分别保存为.png和.mat
         save_path------train\test---name--- name_001.png, name_002.png, ...name_001.mat, name_002.mat, ...
@@ -189,16 +194,48 @@ class load_synth():
             dir = os.path.join(temp_dir, self.name[:-2])
             os.makedirs(dir, exist_ok=True)
 
+            # pressure_map_path = os.path.join(dir, f'{i}.png')
+            skeleton_annotations_path = os.path.join(dir,  f'{i}.mat')
+            # cv2.imwrite(pressure_map_path, self.get_pmap(i))
+            scipy.io.savemat(skeleton_annotations_path, {'image':self.dat['images'][i],
+                                                        'mesh_contact':self.dat['mesh_contact'][i],
+                                                        'mesh_depth':self.dat['mesh_depth'][i],
+                                                         'skeleton':self.get_groundtruthmesh(i)+self.dat['root_xyz_shift'][i],
+                                                         'trans':self.dat['root_xyz_shift'][i],
+                                                         'shape':self.dat['body_shape'][i],
+                                                         'pose': self.dat['joint_angles'][i],
+                                                         'gender': self.gender
+                                                          })
+            
+    def to_file_mod1(self, save_path):
+
+        print(f'coverting file {self.name} to pressure map and skeleton...')
+        root_dir = os.path.join(save_path)
+        for i in range(self.length):
+            print(f'frame {i}', end='\r')
+            if "test_" in self.name:
+                temp_dir = os.path.join(root_dir, 'test')
+            elif "train_" in self.name:
+                temp_dir = os.path.join(root_dir, 'train')
+
+            dir = os.path.join(temp_dir, self.name[:-2])
+            os.makedirs(dir, exist_ok=True)
+
             pressure_map_path = os.path.join(dir, f'{i}.png')
             skeleton_annotations_path = os.path.join(dir,  f'{i}.mat')
             cv2.imwrite(pressure_map_path, self.get_pmap(i))
-            scipy.io.savemat(skeleton_annotations_path, {'3D_skeleton_annotation':self.get_skeleton(i)})
+            scipy.io.savemat(skeleton_annotations_path, {'3D_skeleton_annotation':self.get_skeleton(i),
+                                                         'trans':self.get_trans(i),
+                                                         'mesh':self.get_groundtruthmesh(i)})
+        
 
-
+        # 关闭LMDB环境
+        env.close()
 
 if __name__ == "__main__":
     # import os
     root_path = r'D:\workspace\python_ws\bodies-at-rest-master\data_BR\synth'
+
 
     for root, dirnames, filenames in os.walk(root_path):
         # print(root)
@@ -206,7 +243,16 @@ if __name__ == "__main__":
         # print(dirnames)
         for filename in filenames:
             sbj = load_synth(root+ '\\' +filename)
-            sbj.to_file_mod1(r"D:\workspace\python_ws\bodies-at-rest-master\dataset")
+            sbj.to_file_mod2(r"D:\workspace\python_ws\bodies-at-rest-master\dataset")
+            # img = sbj.get_pmap()
+            # skel = sbj.get_skeleton()
+            # print(img.dtype)
+            # print(skel.dtype)
+            ''''''
+            # break
+        # break
 
     # sbj = load_synth(r"data_BR\synth\crossed_legs\test_roll0_xl_f_lay_set1both_500.p")
+    # print(sbj.get_groundtruthmesh(1))
     # sbj.to_file_mod1(r"D:\workspace\python_ws\bodies-at-rest-master\dataset")
+

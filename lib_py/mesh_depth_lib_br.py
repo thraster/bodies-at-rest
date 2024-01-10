@@ -262,7 +262,7 @@ class MeshDepthLib():
                 model_path_f = '../smpl/models/basicModel_f_lbs_10_207_0_v1.0.0.pkl'
                 human_f = load_model(model_path_f)
                 self.v_template_f = torch.Tensor(np.array(human_f.v_template)).type(dtype)
-                self.shapedirs_f = torch.Tensor(np.array(human_f.shapedirs)).permute(0, 2, 1).type(dtype)
+                self.shapedirs_f = torch.Tensor(np.array(human_f.shapedirs)).permute(0, 2, 1).type(dtype) # .permute(0, 2, 1) 这将维度0保持不变，将维度1和维度2进行交换
                 self.J_regressor_f = np.zeros((human_f.J_regressor.shape)) + human_f.J_regressor
                 self.J_regressor_f = torch.Tensor(np.array(self.J_regressor_f).astype(float)).permute(1, 0).type(dtype)
                 print verts_list[0], verts_list[1]

@@ -6,20 +6,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.pylab import *
 
-import cPickle as pkl
+import pickle
 import random
 from scipy import ndimage
 import scipy.stats as ss
-from scipy.misc import imresize
-from scipy.ndimage.interpolation import zoom
+# from scipy.misc import imresize
+# from scipy.ndimage.interpolation import zoom
 #from skimage.feature import hog
 #from skimage import data, color, exposure
 
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import scale
-from sklearn import svm, linear_model, decomposition, kernel_ridge, neighbors
-from sklearn import metrics
-from sklearn.utils import shuffle
+# from sklearn.cluster import KMeans
+# from sklearn.preprocessing import scale
+# from sklearn import svm, linear_model, decomposition, kernel_ridge, neighbors
+# from sklearn import metrics
+# from sklearn.utils import shuffle
 
 
 
@@ -46,15 +46,16 @@ HIGH_TAXEL_THRESH_Y = (NUMOFTAXELS_Y - 1)
 
 
 # import hrl_lib.util as ut
-import cPickle as pickle
+
 # from hrl_lib.util import load_pickle
 def load_pickle(filename):
     with open(filename, 'rb') as f:
-        return pickle.load(f)
+        return pickle.load(f, encoding='latin1')
 
 
 class TensorPrepLib():
 
+    # 把指定路径下的同类型的.p文件拼合为一个超大的.p文件
     def load_files_to_database(self, database_file, creation_type, verbose = False, reduce_data = False, test = False):
         # load in the training or testing files.  This may take a while.
        # print "GOT HERE!!", database_file
@@ -63,7 +64,7 @@ class TensorPrepLib():
             #print creation_type, some_subject, 'some subject'
             if creation_type in some_subject:
                 dat_curr = load_pickle(some_subject)
-                print some_subject, dat_curr['bed_angle_deg'][0]
+                print(some_subject, dat_curr['bed_angle_deg'][0])
                 for key in dat_curr:
                     if np.array(dat_curr[key]).shape[0] != 0:
                         for inputgoalset in np.arange(len(dat_curr['images'])):
@@ -101,9 +102,10 @@ class TensorPrepLib():
 
         if dat is not None and verbose == True:
             for key in dat:
-                print 'all data keys and shape', key, np.array(dat[key]).shape
+                print( 'all data keys and shape', key, np.array(dat[key]).shape)
         return dat
 
+    # 把male和female的数据返回为一个列表
     def prep_images(self, im_list, dat_f, dat_m, num_repeats):
         for dat in [dat_f, dat_m]:
             if dat is not None:
@@ -143,16 +145,16 @@ class TensorPrepLib():
             mesh_depth_contact_maps_input_est = np.array(mesh_depth_contact_maps_input_est)
             train_xa = np.concatenate((mesh_depth_contact_maps_input_est, train_xa), axis = 1)
 
-        print np.shape(train_xa), CTRL_PNL['incl_pmat_cntct_input']
+        print( np.shape(train_xa), CTRL_PNL['incl_pmat_cntct_input'])
         if CTRL_PNL['incl_pmat_cntct_input'] == True:
             train_xa = np.concatenate((train_contact, train_xa), axis=1)
 
-        print np.shape(train_xa)
+        print( np.shape(train_xa))
         if CTRL_PNL['depth_map_labels'] == True:
             mesh_depth_contact_maps = np.array(mesh_depth_contact_maps) #GROUND TRUTH
             train_xa = np.concatenate((train_xa, mesh_depth_contact_maps), axis=1)
 
-        print "TRAIN XA SHAPE", np.shape(train_xa)
+        print( "TRAIN XA SHAPE", np.shape(train_xa))
 
         return train_xa
 
@@ -304,7 +306,7 @@ class TensorPrepLib():
             if CTRL_PNL['cal_noise'] == True: normalizing_std_constants = normalizing_std_constants[1:] #here we don't precompute the contact
 
             for i in range(x.shape[1]):
-                print "normalizing idx", i
+                print( "normalizing idx", i)
                 x[:, i, :, :] *= normalizing_std_constants[i]
 
             #for i in range(x.shape[0]):

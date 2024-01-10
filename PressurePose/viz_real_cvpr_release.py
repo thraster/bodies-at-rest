@@ -14,9 +14,9 @@ import os
 sys.path.append(os.path.abspath('..'))
 sys.path.insert(0, '../lib_py')
 import lib_pyrender_basic as libPyRender
-from smpl.smpl_webuser.serialization import load_model
+# from smpl.smpl_webuser.serialization import load_model
 
-import cPickle as pkl
+# import cPickle as pkl
 
 def load_pickle(filename):
     with open(filename, 'rb') as f:
@@ -28,7 +28,7 @@ def load_pickle(filename):
 from time import sleep
 from scipy.stats import mode
 import os.path as osp
-import imutils
+# import imutils
 
 
 import matplotlib.cm as cm #use cm.jet(list)
@@ -36,14 +36,14 @@ import matplotlib.cm as cm #use cm.jet(list)
 DATASET_CREATE_TYPE = 1
 
 import cv2
-from camera import Camera
+# from camera import Camera
 
 import math
 from random import shuffle
 import torch
 import torch.nn as nn
 
-import cPickle as pickle
+import pickle
 VERT_CUT, HORIZ_CUT = 0, 50
 pre_VERT_CUT = 40
 
@@ -71,9 +71,9 @@ class Viz3DPose():
     def load_new_participant_info(self, participant_directory):
         ##load participant info
         participant_info = load_pickle(participant_directory+"/participant_info_red.p")
-        print "participant directory: ", participant_directory
+        print ("participant directory: ", participant_directory)
         for entry in participant_info:
-            print entry, participant_info[entry]
+            print (entry, participant_info[entry])
 
         self.gender = participant_info['gender']
         self.height_in = participant_info['height_in']
@@ -140,7 +140,7 @@ class Viz3DPose():
 
             pmat_corners = dat['pmat_corners'][im_num]
             rgb = dat['RGB'][im_num]
-            print "Pose type: ", dat['pose_type'][im_num]
+            print( "Pose type: "), dat['pose_type'][im_num]
 
             rgb[int(pmat_corners[0][1]+0.5)-2:int(pmat_corners[0][1]+0.5)+2, \
                 int(pmat_corners[0][0]+0.5)-2:int(pmat_corners[0][0]+0.5)+2, :] = 0
@@ -220,82 +220,85 @@ class Viz3DPose():
 
 if __name__ ==  "__main__":
 
-    import optparse
+    def test():
+        import optparse
 
 
 
-    GENDER = "f"
+        GENDER = "f"
 
-    #Replace this with some subset of data of your choice
-    TESTING_FILENAME = "quick_test/test_rollpi_"+GENDER+"_lay_set23to24_3000"
-
-
+        #Replace this with some subset of data of your choice
+        TESTING_FILENAME = "quick_test/test_rollpi_"+GENDER+"_lay_set23to24_3000"
 
 
-    p = optparse.OptionParser()
-    p.add_option('--pose_type', action='store', type='string', dest='pose_type', default='none',
-                 help='Choose a pose type, either `prescribed` or `p_select`.')
-
-    p.add_option('--p_idx', action='store', type='int', dest='p_idx', default=0,
-                 # PMR parameter to adjust loss function 2
-                 help='Choose a participant. Enter a number from 1 to 20.')
-
-    p.add_option('--hd', action='store_true', dest='hd', default=False,
-                 help='Read and write to data on an external harddrive.')
-    
-
-    opt, args = p.parse_args()
 
 
-    participant_list = ["S103",
-                        "S104",
-                        "S107",
-                        "S114",
-                        "S118",
-                        "S121",
-                        "S130",
-                        "S134",
-                        "S140",
-                        "S141",
+        p = optparse.OptionParser()
+        p.add_option('--pose_type', action='store', type='string', dest='pose_type', default='none',
+                    help='Choose a pose type, either `prescribed` or `p_select`.')
 
-                        "S145",
-                        "S151",
-                        "S163",
-                        "S165",
-                        "S170",
-                        "S179",
-                        "S184",
-                        "S187",
-                        "S188",
-                        "S196", ]
+        p.add_option('--p_idx', action='store', type='int', dest='p_idx', default=0,
+                    # PMR parameter to adjust loss function 2
+                    help='Choose a participant. Enter a number from 1 to 20.')
 
-    if opt.p_idx == 0:
-        print "Please choose a participant with flag `--p_idx #`. Enter a number from 1 to 20."
-        sys.exit()
-    else:
-        PARTICIPANT = participant_list[opt.p_idx - 1]
-
-    V3D = Viz3DPose()
-
-
-    if opt.hd == True:
-        participant_directory = "/media/henry/multimodal_data_2/data_BR/real/"+PARTICIPANT
-    else:
-        participant_directory = "../data_BR/real/"+PARTICIPANT
+        p.add_option('--hd', action='store_true', dest='hd', default=False,
+                    help='Read and write to data on an external harddrive.')
         
 
-    V3D.load_new_participant_info(participant_directory)
-
-    if opt.pose_type == "prescribed":
-        dat = load_pickle(participant_directory+"/prescribed.p")
-    elif opt.pose_type == "p_select":
-        dat = load_pickle(participant_directory+"/p_select.p")
-    else:
-        print "Please choose a pose type - either prescribed poses, " \
-              "'--pose_type prescribed', or participant selected poses, '--pose_type p_select'."
-        sys.exit()
-
-    F_eval = V3D.evaluate_data(dat)
+        opt, args = p.parse_args()
 
 
+        participant_list = ["S103",
+                            "S104",
+                            "S107",
+                            "S114",
+                            "S118",
+                            "S121",
+                            "S130",
+                            "S134",
+                            "S140",
+                            "S141",
+
+                            "S145",
+                            "S151",
+                            "S163",
+                            "S165",
+                            "S170",
+                            "S179",
+                            "S184",
+                            "S187",
+                            "S188",
+                            "S196", ]
+
+        if opt.p_idx == 0:
+            print( "Please choose a participant with flag `--p_idx #`. Enter a number from 1 to 20.")
+            sys.exit()
+        else:
+            PARTICIPANT = participant_list[opt.p_idx - 1]
+
+        V3D = Viz3DPose()
+
+
+        if opt.hd == True:
+            participant_directory = "/media/henry/multimodal_data_2/data_BR/real/"+PARTICIPANT
+        else:
+            participant_directory = "../data_BR/real/"+PARTICIPANT
+            
+
+        V3D.load_new_participant_info(participant_directory)
+
+        if opt.pose_type == "prescribed":
+            dat = load_pickle(participant_directory+"/prescribed.p")
+        elif opt.pose_type == "p_select":
+            dat = load_pickle(participant_directory+"/p_select.p")
+        else:
+            print ("Please choose a pose type - either prescribed poses, " \
+                "'--pose_type prescribed', or participant selected poses, '--pose_type p_select'.")
+            sys.exit()
+        # pmat,pshape = V3D.pressure_image(dat)
+        # print(pmat,pshape)
+        F_eval = V3D.evaluate_data(dat)
+
+    V3D = Viz3DPose()
+    V3D.load_new_participant_info(r'D:\workspace\python_ws\bodies-at-rest-master\data_BR\real\S103')
 

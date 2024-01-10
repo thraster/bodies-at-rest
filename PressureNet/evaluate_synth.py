@@ -439,7 +439,7 @@ class PhysicalTrainer():
                         root_shift = root_shift_est
 
                     print root_shift, 'root shift'
-                    # get SMPL mesh
+                    # get SMPL mesh         # self.m.J_transformed is the ground truth of joints
                     smpl_verts = (self.m.r - self.m.J_transformed[0, :]) + [root_shift[1] - 0.286 + 0.15,
                                                                             root_shift[0] - 0.286,
                                                                             0.12 - root_shift[2]]  # *228./214.

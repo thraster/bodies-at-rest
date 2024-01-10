@@ -82,6 +82,10 @@ class PhysicalTrainer():
         3d position and orientation of the markers associated with it.'''
 
 
+        '''
+        1. 初始化各项输入
+        '''
+
         self.CTRL_PNL = {}
         self.CTRL_PNL['loss_vector_type'] = opt.losstype
         self.CTRL_PNL['verbose'] = opt.verbose
@@ -182,7 +186,11 @@ class PhysicalTrainer():
         self.output_size_val = (NUMOFOUTPUTNODES_TEST, NUMOFOUTPUTDIMS)
         self.parents = np.array([4294967295, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19, 20, 21]).astype(np.int32)
 
-
+        '''
+        2. 准备训练数据
+            - 加载数据
+            - 归一化等处理
+        '''
 
         #################################### PREP TRAINING DATA ##########################################
         #load training ysnth data
@@ -253,10 +261,14 @@ class PhysicalTrainer():
 
         self.train_y_tensor = torch.Tensor(train_y_flat)
 
-        print self.train_x_tensor.shape, 'Input training tensor shape'
-        print self.train_y_tensor.shape, 'Output training tensor shape'
+        print (self.train_x_tensor.shape, 'Input training tensor shape')
+        print (self.train_y_tensor.shape, 'Output training tensor shape')
 
-
+        '''
+        3. 准备测试数据
+            - 加载测试数据
+            - 归一化等操作
+        '''
 
 
         #################################### PREP TESTING DATA ##########################################
@@ -337,8 +349,8 @@ class PhysicalTrainer():
         self.test_y_tensor = torch.Tensor(test_y_flat)
 
 
-        print self.test_x_tensor.shape, 'Input testing tensor shape'
-        print self.test_y_tensor.shape, 'Output testing tensor shape'
+        print( self.test_x_tensor.shape, 'Input testing tensor shape')
+        print( self.test_y_tensor.shape, 'Output testing tensor shape')
 
 
 
@@ -373,7 +385,7 @@ class PhysicalTrainer():
         if  self.opt.half_shape_wt == True:
             self.save_name += '_hsw'
 
-        print 'appending to', 'train' + self.save_name
+        print( 'appending to', 'train' + self.save_name)
         self.train_val_losses = {}
         self.train_val_losses['train_loss'] = []
         self.train_val_losses['val_loss'] = []
@@ -393,7 +405,7 @@ class PhysicalTrainer():
 
 
 
-        print "Loading convnet model................................"
+        print ("Loading convnet model................................")
 
         fc_output_size = 85## 10 + 3 + 24*3 --- betas, root shift, rotations
 
@@ -424,7 +436,7 @@ class PhysicalTrainer():
             for s in list(p.size()):
                 nn = nn * s
             pp += nn
-        print 'LOADED. num params: ', pp
+        print ('LOADED. num params: ', pp)
 
 
         # Run model on GPU if available
@@ -446,7 +458,7 @@ class PhysicalTrainer():
                 self.t2 = time.time() - self.t1
             except:
                 self.t2 = 0
-            print 'Time taken by epoch',epoch,':',self.t2,' seconds'
+            print( 'Time taken by epoch',epoch,':',self.t2,' seconds')
 
             if epoch == self.CTRL_PNL['num_epochs'] or epoch == 10 or epoch == 20 or epoch == 30 or epoch == 40 or epoch == 50 or epoch == 60 or epoch == 70 or epoch == 80 or epoch == 90:
 
@@ -455,13 +467,13 @@ class PhysicalTrainer():
                 else:
                     epoch_log = epoch + 0
 
-                print "saving convnet."
+                print ("saving convnet.")
                 torch.save(self.model, self.CTRL_PNL['convnet_fp_prefix']+'convnet'+self.save_name+'_'+str(epoch_log)+'e'+'_'+str(learning_rate)+'lr.pt')
-                print "saved convnet."
+                print ("saved convnet.")
                 pkl.dump(self.train_val_losses,open(self.CTRL_PNL['convnet_fp_prefix']+'convnet_losses'+self.save_name+'_'+str(epoch_log)+'e'+'_'+str(learning_rate)+'lr.p', 'wb'))
-                print "saved losses."
+                print( "saved losses.")
 
-        print self.train_val_losses, 'trainval'
+        print( self.train_val_losses, 'trainval')
         # Save the model (architecture and weights)
 
 
@@ -484,6 +496,11 @@ class PhysicalTrainer():
 
 
                 self.optimizer.zero_grad()
+                '''
+                UnpackBatchLib().unpack_batch中传入batch(图像)
+                OUTPUT_DICT中包含的可能为shape参数、trans、pose参数
+                scores
+                '''
                 scores, INPUT_DICT, OUTPUT_DICT = \
                     UnpackBatchLib().unpack_batch(batch, is_training=True, model = self.model, CTRL_PNL=self.CTRL_PNL)
                 #print torch.cuda.max_memory_allocated(), '1post train'
@@ -501,7 +518,8 @@ class PhysicalTrainer():
                     #if self.CTRL_PNL['adjust_ang_from_est'] == True:
                     #    loss_bodyrot *= 0
                 else: OSA = 0
-
+                
+                # 长24的tensor
                 loss_eucl = self.criterion(scores[:, 10+OSA:34+OSA], scores_zeros[:, 10+OSA:34+OSA])*self.weight_joints
                 if self.opt.half_shape_wt == True:
                     loss_betas = self.criterion(scores[:, 0:10], scores_zeros[:, 0:10]) * self.weight_joints * 0.5
@@ -510,6 +528,7 @@ class PhysicalTrainer():
 
 
                 if self.CTRL_PNL['regr_angles'] == True:
+                    # 长72的tensor 24*3
                     loss_angs = self.criterion2(scores[:, 34+OSA:106+OSA], scores_zeros[:, 34+OSA:106+OSA])*self.weight_joints
                     loss = (loss_betas + loss_eucl + loss_bodyrot + loss_angs)
                 else:
@@ -839,7 +858,7 @@ if __name__ == "__main__":
         data_fp_suffix = ''
 
     else:
-        print "Please choose a valid network. You can specify '--net 1' or '--net 2'."
+        print( "Please choose a valid network. You can specify '--net 1' or '--net 2'.")
         sys.exit()
 
     training_database_file_f = []
